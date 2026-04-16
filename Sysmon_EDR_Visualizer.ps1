@@ -1,9 +1,11 @@
 <#
     Sysmon EDR Visualizer - Pro Edition
+    Copyright (c) 2026 [Your Name]
+    License: MIT (https://opensource.org/licenses/MIT)
+
     - Startup Prompt for live logs
-    - Hierarchical Process-Activity Trees for ALL Events
-    - Chronological Sorting: Newest to Oldest (Descending)
-    - Instant HTML View and Manual Save
+    - Hierarchical Process-Activity Trees
+    - Chronological Sorting (Newest First)
 #>
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
