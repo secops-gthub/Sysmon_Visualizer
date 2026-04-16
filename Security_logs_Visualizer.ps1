@@ -6,6 +6,7 @@
 #>
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
+Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Windows.Forms
 
 # ------------------------------
 # CORE: UNIVERSAL PARSING ENGINE
