@@ -42,4 +42,4 @@ Upon launch, a Selection Hub appears.
 2. Open PowerShell 7 as **Administrator**.
 3. Execute the script:
    ```powershell
-   .\Security_logs_analyzer.ps1
+   .\Security_logs_Visualizer.ps1
