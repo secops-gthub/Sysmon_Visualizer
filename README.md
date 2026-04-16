@@ -1,30 +1,45 @@
-# Sysmon EDR Tree Visualizer
+# Multi-Source EDR Visualizer (Sysmon, Defender, & Security)
 
-A professional-grade PowerShell security tool designed to reconstruct Sysmon Event Logs into a hierarchical, EDR-style process tree. This tool helps security analysts visualize the relationship between process executions, network connections, file creations, and DNS queries.
+A high-fidelity security analysis tool that reconstructs Windows event logs into a hierarchical, EDR-style process tree. This version supports cumulative loading, allowing analysts to merge live logs and forensic files into a single unified timeline.
 
-## 🚀 Features
+## 🚀 Key Features
 
-- **EDR-Style Visualization**: Reconstructs activity into a nested tree format (e.g., `explorer.exe` -> `chrome.exe` -> `google.com`).
-- **Live & Static Analysis**: Automatically prompts to load live `Microsoft-Windows-Sysmon/Operational` logs on launch, with a fallback to `.evtx` or `.xml` files.
-- **Advanced Filtering**:
-    - **Event ID**: Filter by specific IDs (e.g., 1, 3, 11, 22).
-    - **Date/Time**: Narrow down incidents with precise start and end dates.
-    - **User**: Isolate activity by specific user accounts.
-    - **Tree Search**: Perform string searches directly against the rendered process tree.
-- **Instant Reporting**:
-    - **Open HTML**: Generates a temporary report and launches it in your default browser.
-    - **Save HTML**: Saves a standalone HTML report for documentation and handovers.
+- **Multi-Source Ingestion**: Combines data from:
+    - **Sysmon**: Detailed process behavior, network connections, and DNS queries.
+    - **Windows Defender**: Malware detections and automated remediation actions.
+    - **Windows Security**: User logons (ID 4624), failures (4625), and process auditing (4688).
+- **Selection Hub**: A pre-launch dashboard to toggle specific live log sources for a 24-hour lookback.
+- **Cumulative Loading**: Merge multiple `.evtx` or `.xml` files without wiping existing data—perfect for tracking lateral movement across different machines.
+- **EDR-Style Visualization**: Maps parent-child relationships with specialized icons (⚠️ for threats, 🔑 for logons).
+- **Advanced Filtering**: Real-time "Search-as-you-type" filtering across the entire merged activity tree.
 
 ## 📋 Requirements
 
 - **OS**: Windows 10/11 or Windows Server 2016+.
-- **PowerShell**: Version PowerShell 7+.
-- **Permissions**: **Administrative Privileges** are required to read live local Sysmon logs.
-- **Software**: [Sysinternals Sysmon](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon) must be installed and configured on the system being analyzed.
+- **PowerShell**: **Version 7.x** (Optimized for speed and modern XAML handling).
+- **Permissions**: Must be run as **Administrator** to access the Windows Security and Sysmon log streams.
+- **Dependencies**: [Sysinternals Sysmon](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon) should be installed for process/network visibility.
 
-## 🛠️ Installation & Usage
+## 🛠️ How It Works
 
-1. **Download**: Save `Sysmon_Visualizer.ps1` to your machine.
-2. **Run**: Open PowerShell as **Administrator** and execute:
+### 1. Source Selection
+Upon launch, a Selection Hub appears. 
+- **Live Load**: Check the logs you wish to pull from the local machine (Last 24 hours).
+- **Manual Import**: Skip live logs to go directly to the dashboard for file analysis.
+
+### 2. The Dashboard
+- **Add Log File**: Import external logs. These will be added to your current view rather than replacing it.
+- **Clear All**: Resets the memory to start a fresh investigation.
+- **Filter**: Instantly narrows down the tree by User, IP, Image name, or Threat name.
+
+### 3. Reporting
+- **Open HTML**: Generates a temporary, interactive report in your default browser.
+- **Save HTML**: Exports a standalone report for evidence or peer review.
+
+## 📥 Installation
+
+1. Clone the repository or download `Security_logs_analyzer.ps1`.
+2. Open PowerShell 7 as **Administrator**.
+3. Execute the script:
    ```powershell
-   .\Sysmon_EDR_Visualizer.ps1
+   .\Security_logs_analyzer.ps1
