@@ -1,8 +1,8 @@
 <#
-    Advanced EDR Multi-Source Visualizer - COMBINED & FIXED
-    - FIXED: Applying an empty filter now restores all original logs.
-    - FIXED: Universal XML parsing for Security logs (4624, 4798, 5379, etc.).
-    - KEEPS: Original UI, HTML export, and source selection.
+    Advanced EDR Multi-Source Visualizer - CUMULATIVE & DATE FILTERED
+    - FIXED: Date Range filtering for older/manual logs.
+    - FIXED: Performance optimized HTML Export (no more freezing).
+    - FIXED: Universal XML property mapping for all Security Event IDs.
 #>
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
@@ -13,6 +13,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 function Get-CombinedEDREvents {
     param([string]$Path = $null, [string[]]$LiveLogs = @())
     $events = @()
+    # Only use lookback for Live Logs; Manual imports should take everything
     $lookbackTime = (Get-Date).AddDays(-1) 
 
     try {
@@ -30,14 +31,11 @@ function Get-CombinedEDREvents {
     } catch { return @() }
 
     $parsedData = foreach ($e in $events) {
-        # Universal XML extraction for both live logs and exported files
         $xml = if ($e.ToXml) { [xml]$e.ToXml() } else { [xml]$e }
-        
         $id = [int]($xml.Event.System.EventID.'#text' ?? $xml.Event.System.EventID ?? $e.Id)
         $provider = $xml.Event.System.Provider.Name ?? $e.ProviderName
         $timeCreated = [datetime]($xml.Event.System.TimeCreated.SystemTime ?? $e.TimeCreated)
 
-        # Map EventData properties (like TargetUserName)
         $data = @{}
         foreach ($node in $xml.Event.EventData.Data) {
             if ($node.Name) { $data[$node.Name] = $node.'#text' }
@@ -47,7 +45,6 @@ function Get-CombinedEDREvents {
         $detectedUser = $data.TargetUserName ?? $data.SubjectUserName ?? $data.User ?? "N/A"
         $imagePath = $data.NewProcessName ?? $data.Image ?? $data.ProcessName ?? "System/EDR"
 
-        # Build human-readable details
         $details = if ($provider -like "*Security-Auditing*") {
             switch($id) {
                 4624 { "🔑 LOGON: Type $($data.LogonType) - Target: $($data.TargetUserName) - IP: $($data.IpAddress ?? 'Local')" }
@@ -89,10 +86,38 @@ function Get-EDRTreeView {
             Time         = $item.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss.fff")
             User         = $item.User
             EventID      = $item.EventID
-            ActivityTree = "$($item.TimeCreated.ToString('HH:mm:ss.fff')) | ID:$($item.EventID) | $($item.Image)`n ┗━━ $($item.Details)"
+            ActivityTree = "ID:$($item.EventID) | $($item.Image)`n ┗━━ $($item.Details)"
             RawDate      = $item.TimeCreated
         }
     }
+}
+
+# ------------------------------
+# OPTIMIZED HTML ENGINE
+# ------------------------------
+function ConvertTo-HtmlReport {
+    param($DataItems)
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append(@"
+<html><head><style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 30px; background-color: #f8f9fa; }
+    h2 { color: #0078D4; border-bottom: 2px solid #0078D4; padding-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    th { background-color: #0078D4; color: white; padding: 12px; text-align: left; }
+    td { padding: 10px; border-bottom: 1px solid #dee2e6; font-family: 'Consolas', monospace; font-size: 12px; vertical-align: top; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+    .tree { white-space: pre-wrap; color: #333; }
+</style></head>
+<body>
+    <h2>EDR Investigation Activity Report</h2>
+    <table><tr><th>Time</th><th>User</th><th>ID</th><th>Activity / Details</th></tr>
+"@)
+    foreach ($row in $DataItems) {
+        $cleanTree = [System.Net.WebUtility]::HtmlEncode($row.ActivityTree)
+        [void]$sb.Append("<tr><td>$($row.Time)</td><td>$($row.User)</td><td>$($row.EventID)</td><td class='tree'>$cleanTree</td></tr>")
+    }
+    [void]$sb.Append("</table></body></html>")
+    return $sb.ToString()
 }
 
 # ------------------------------
@@ -157,7 +182,10 @@ $mainXaml = @"
                 </StackPanel>
                 <StackPanel Margin="0,0,10,0">
                     <TextBlock Text="Date Range:" FontSize="10"/>
-                    <StackPanel Orientation="Horizontal"><DatePicker x:Name="DpStart" Width="100"/><DatePicker x:Name="DpEnd" Width="100" Margin="5,0,0,0"/></StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <DatePicker x:Name="DpStart" Width="110"/>
+                        <DatePicker x:Name="DpEnd" Width="110" Margin="5,0,0,0"/>
+                    </StackPanel>
                 </StackPanel>
                 <StackPanel Margin="0,0,10,0">
                     <TextBlock Text="Filter Activity:" FontSize="10"/>
@@ -175,6 +203,7 @@ $mainXaml = @"
                 <DataGridTextColumn Header="Activity Tree" Binding="{Binding ActivityTree}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
+        <StatusBar Grid.Row="3" Background="#F0F0F0"><StatusBarItem><TextBlock x:Name="TxtStatus" Text="Ready"/></StatusBarItem></StatusBar>
     </Grid>
 </Window>
 "@
@@ -182,6 +211,7 @@ $mainXaml = @"
 $reader = [System.Xml.XmlNodeReader]::new(([xml]$mainXaml))
 $window = [Windows.Markup.XamlReader]::Load($reader)
 $grid = $window.FindName('GridEvents')
+$txtStatus = $window.FindName('TxtStatus')
 $script:RawData = @()
 
 if ($script:selectedLogs.Count -gt 0) {
@@ -192,8 +222,10 @@ if ($script:selectedLogs.Count -gt 0) {
 $window.FindName('BtnLoad').Add_Click({
     $dlg = [Microsoft.Win32.OpenFileDialog]::new()
     if ($dlg.ShowDialog()) {
-        $script:RawData += Get-CombinedEDREvents -Path $dlg.FileName
+        $newData = Get-CombinedEDREvents -Path $dlg.FileName
+        $script:RawData += $newData
         $grid.ItemsSource = Get-EDRTreeView -Events $script:RawData
+        $txtStatus.Text = "Added $($newData.Count) events. Total: $($script:RawData.Count)"
     }
 })
 
@@ -202,7 +234,7 @@ $window.FindName('BtnApply').Add_Click({
     $iFilt = $window.FindName('TbIdFilt').Text
     $tFilt = $window.FindName('TbTreeFilt').Text
     $start = $window.FindName('DpStart').SelectedDate
-    $end = $window.FindName('DpEnd').SelectedDate
+    $end   = $window.FindName('DpEnd').SelectedDate
 
     # If all fields are blank, reset to original logs
     if ([string]::IsNullOrWhiteSpace($uFilt) -and [string]::IsNullOrWhiteSpace($iFilt) -and 
@@ -221,12 +253,34 @@ $window.FindName('BtnApply').Add_Click({
     $grid.ItemsSource = Get-EDRTreeView -Events $filtered
 })
 
+$window.FindName('BtnHtmlOpen').Add_Click({
+    if ($null -eq $grid.ItemsSource) { return }
+    $txtStatus.Text = "Building Report..."
+    [System.Windows.Forms.Application]::DoEvents()
+
+    $tempPath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "EDR_Investigation_$(Get-Date -Format 'HHmm').html")
+    $html = ConvertTo-HtmlReport -DataItems $grid.ItemsSource
+    Set-Content -Path $tempPath -Value $html
+    
+    Start-Process $tempPath
+    $txtStatus.Text = "Report opened."
+})
+
+$window.FindName('BtnHtmlSave').Add_Click({
+    if ($null -eq $grid.ItemsSource) { return }
+    $dlg = [Microsoft.Win32.SaveFileDialog]::new()
+    $dlg.Filter = "HTML Files (*.html)|*.html"
+    if ($dlg.ShowDialog()) {
+        $html = ConvertTo-HtmlReport -DataItems $grid.ItemsSource
+        Set-Content -Path $dlg.FileName -Value $html
+        $txtStatus.Text = "Exported to $($dlg.FileName)"
+    }
+})
+
 $window.FindName('BtnClear').Add_Click({
     $script:RawData = @()
     $grid.ItemsSource = $null
-    $window.FindName('TbUserFilt').Text = ""
-    $window.FindName('TbIdFilt').Text = ""
-    $window.FindName('TbTreeFilt').Text = ""
+    $txtStatus.Text = "Investigation Cleared."
 })
 
 $window.ShowDialog() | Out-Null
