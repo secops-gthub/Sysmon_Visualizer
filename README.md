@@ -34,9 +34,11 @@ A high-fidelity security analysis tool that reconstructs Windows event logs into
     Permissions: Administrator privileges are required to access live local log streams.
 
 🛠️ How It Works
+
 1. Source Selection
 
 Upon launch, choose to pull Live Logs (last 24 hours) from the local machine or proceed to the dashboard for Manual Import of forensic files.
+
 2. The Dashboard
 
     Add Log: Merge new .evtx files into your current timeline.
@@ -46,6 +48,7 @@ Upon launch, choose to pull Live Logs (last 24 hours) from the local machine or 
     Universal Filter: Filter by User, Event ID, SHA256 Hash, Date Range, or activity keywords.
 
     Status Bar: Provides real-time feedback on log counts and processing status.
+
 
 3. Reporting
 
